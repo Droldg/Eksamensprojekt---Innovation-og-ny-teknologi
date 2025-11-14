@@ -1,5 +1,4 @@
-# GK2---Innovation
-Godkendelsesopgave 2 - Innovation og ny teknologi
+# Eksamensprojekt---Innovation-og-ny-teknologi
 
 Velkommen til MadRedder!
 
