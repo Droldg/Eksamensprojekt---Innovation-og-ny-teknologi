@@ -35,7 +35,10 @@ export default function Signup() {
     }
 
     if (password.length < 6) {
-      Alert.alert("For kort adgangskode", "Adgangskoden skal være mindst 6 tegn.");
+      Alert.alert(
+        "For kort adgangskode",
+        "Adgangskoden skal være mindst 6 tegn."
+      );
       return;
     }
 
@@ -48,9 +51,11 @@ export default function Signup() {
       );
 
       // Gem ekstra brugerdata i Firestore (collection: users)
+      // locID sættes til null fra start – udfyldes senere fra HomeScreen
       await setDoc(doc(db, "users", cred.user.uid), {
         email: emailTrimmed,
         phone: phoneTrimmed,
+        locID: null,
         createdAt: new Date().toISOString(),
       });
 
@@ -105,4 +110,5 @@ export default function Signup() {
     </View>
   );
 }
-// Signup.js komponenten håndterer brugerregistrering ved at validere input, oprette en bruger i Firebase Authentication og gemme ekstra data i Firestore.
+// Signup.js komponenten håndterer brugerregistrering ved at validere input,
+// oprette brugeren i Firebase Authentication og gemme ekstra data i Firestore.
