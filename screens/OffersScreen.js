@@ -1,58 +1,186 @@
 // screens/OffersScreen.js
-import React, { useMemo, useState } from "react";
-import { View, Text, FlatList, Pressable, Platform } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, Text, FlatList, Pressable, Platform, ActivityIndicator, Alert } from "react-native";
 import styles from "../style/styles";
 import { useReservations } from "../context/ReservationsContext";
-
-const seedOffers = [
-  { id: "1", title: "Pastaboks", items: ["Pasta", "Tomatsauce", "Salat"], price: 15, pickup: "15:30-16:30", qty: 3 },
-  { id: "2", title: "Vegetarboks", items: ["Grønt", "Hummus", "Brød"], price: 12, pickup: "15:30-16:00", qty: 0 },
-  { id: "3", title: "Smørrebrød mix", items: ["Æg/rejer", "Frikadelle", "Kartoffel"], price: 20, pickup: "14:45-15:30", qty: 6 },
-  { id: "4", title: "Suppe + brød", items: ["Tomatsuppe", "Flüte"], price: 10, pickup: "15:00-16:00", qty: 4 },
-  { id: "5", title: "Salatbowl", items: ["Kylling", "Quinoa", "Dressing"], price: 18, pickup: "15:15-16:15", qty: 2 },
-  { id: "6", title: "Wokboks", items: ["Nudler", "Grøntsager", "Soja"], price: 16, pickup: "15:20-16:20", qty: 5 },
-  { id: "7", title: "Lasagne", items: ["Oksekød", "Ost", "Salat"], price: 22, pickup: "15:30-16:30", qty: 1 },
-  { id: "8", title: "Dessertboks", items: ["Cheesecake", "Frugt"], price: 8, pickup: "15:30-16:00", qty: 7 },
-];
+import { auth, db } from "../database/database";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  runTransaction,
+  where,
+} from "firebase/firestore";
 
 export default function OffersScreen() {
-  const [offers, setOffers] = useState(seedOffers);
+  const { add, items: reservedItems } = useReservations();
+
+  const [offers, setOffers] = useState([]);
   const [onlyAvailable, setOnlyAvailable] = useState(false);
-  const [reservedIds, setReservedIds] = useState(new Set()); // <- NYT
-  const { add } = useReservations();
+  const [reservedIds, setReservedIds] = useState(new Set());
+
+  const [locID, setLocID] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadingOffers, setLoadingOffers] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Synkroniser markerede reservationer med global state (så de vises som "Reserveret")
+  useEffect(() => {
+    setReservedIds(new Set(reservedItems.map((x) => String(x.id))));
+  }, [reservedItems]);
+
+  // Lyt til brugerens profil for at få locID
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) {
+      setLoadingProfile(false);
+      return;
+    }
+
+    const userRef = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(
+      userRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setLocID(data.locID || null);
+        } else {
+          setLocID(null);
+        }
+        setLoadingProfile(false);
+      },
+      (err) => {
+        console.log("Fejl ved hentning af brugerprofil:", err);
+        setError("Kunne ikke hente din profil");
+        setLoadingProfile(false);
+      }
+    );
+
+    return unsubscribe;
+  }, []);
+
+  // Lyt til tilbud for den aktuelle lokation
+  useEffect(() => {
+    if (!locID) {
+      setOffers([]);
+      return;
+    }
+
+    setLoadingOffers(true);
+    const q = query(collection(db, "offers"), where("locID", "==", locID));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs
+          .map((d) => {
+            const data = d.data();
+            const price = typeof data.price === "string" ? Number(data.price) : data.price;
+            const qty = typeof data.qty === "string" ? Number(data.qty) : data.qty;
+            return {
+              id: d.id,
+              title: data.title || "",
+              items: Array.isArray(data.items) ? data.items : [],
+              price: Number.isFinite(price) ? price : 0,
+              pickup: data.pickup || "",
+              qty: Number.isFinite(qty) ? qty : 0,
+              locID: data.locID || null,
+              active: data.active !== false,
+            };
+          })
+          .filter((o) => o.active);
+
+        setOffers(list);
+        setLoadingOffers(false);
+      },
+      (err) => {
+        console.log("Fejl ved hentning af tilbud:", err);
+        setError("Kunne ikke hente tilbud");
+        setLoadingOffers(false);
+      }
+    );
+
+    return unsubscribe;
+  }, [locID]);
 
   const list = useMemo(
     () => offers.filter((o) => (onlyAvailable ? o.qty > 0 : true)),
     [offers, onlyAvailable]
   );
 
-  const reserve = (offer) => {
-    // hvis allerede reserveret, gør ingenting
+  const reserve = async (offer) => {
     if (reservedIds.has(offer.id)) return;
+    if (!locID) {
+      Alert.alert("Mangler arbejdsplads", "Tilføj din arbejdspladskode først.");
+      return;
+    }
 
-    // 1) -1 på qty lokalt
-    setOffers((prev) =>
-      prev.map((o) => (o.id === offer.id && o.qty > 0 ? { ...o, qty: o.qty - 1 } : o))
-    );
+    try {
+      await runTransaction(db, async (transaction) => {
+        const ref = doc(db, "offers", offer.id);
+        const snap = await transaction.get(ref);
+        if (!snap.exists()) {
+          throw new Error("Tilbud findes ikke længere.");
+        }
 
-    // 2) Tilføj til global reservationsliste
-    add({
-      id: offer.id,
-      title: offer.title,
-      price: offer.price,
-      pickupWindow: offer.pickup,
-      items: offer.items,
-    });
+        const data = snap.data();
+        if (data.locID !== locID) {
+          throw new Error("Tilbud hører til en anden lokation.");
+        }
 
-    // 3) Markér som reserveret (disable knappen for bruger)
-    setReservedIds((prev) => {
-      const next = new Set(prev);
-      next.add(offer.id);
-      return next;
-    });
+        const currentQty = typeof data.qty === "string" ? Number(data.qty) : data.qty || 0;
+        if (currentQty <= 0) {
+          throw new Error("Udsolgt");
+        }
+
+        transaction.update(ref, { qty: currentQty - 1 });
+      });
+
+      // Optimistisk lokalt bump ned – Firestore snapshot korrigerer lige efter
+      setOffers((prev) =>
+        prev.map((o) => (o.id === offer.id ? { ...o, qty: Math.max(0, o.qty - 1) } : o))
+      );
+
+      add({
+        id: offer.id,
+        title: offer.title,
+        price: offer.price,
+        pickupWindow: offer.pickup,
+        items: offer.items,
+      });
+
+      setReservedIds((prev) => new Set([...prev, offer.id]));
+    } catch (e) {
+      if (e.message === "Udsolgt") {
+        Alert.alert("Udsolgt", "Desværre, boksen blev lige nappet.");
+      } else {
+        console.log("Fejl ved reservation:", e);
+        Alert.alert("Fejl", e.message || "Kunne ikke reservere. Prøv igen.");
+      }
+    }
   };
 
   const badgeBg = (qty) => (qty > 0 ? "#1D6142" : "#D33A2C");
+
+  if (loadingProfile) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (!locID) {
+    return (
+      <View style={[styles.container, { justifyContent: "center" }]}>
+        <Text style={styles.title}>Tilføj arbejdspladskode</Text>
+        <Text style={styles.helperText}>
+          Gå til forsiden og tilknyt din 4-cifrede arbejdspladskode for at se tilbud.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -72,6 +200,16 @@ export default function OffersScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {loadingOffers ? (
+        <View style={{ paddingVertical: 16 }}>
+          <ActivityIndicator />
+        </View>
+      ) : null}
+
+      {error ? (
+        <Text style={[styles.helperText, { color: "#D33A2C" }]}>{error}</Text>
+      ) : null}
 
       <FlatList
         data={list}

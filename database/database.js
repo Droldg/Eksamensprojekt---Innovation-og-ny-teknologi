@@ -3,14 +3,17 @@ import { initializeApp } from "firebase/app";
 import { initializeAuth, getReactNativePersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
+
+const extra = Constants.expoConfig?.extra || Constants.manifest?.extra || {};
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC4w3YodBPq4jrIh3OvILHwopP6Rjogwfo",
-  authDomain: "inno-database.firebaseapp.com",
-  projectId: "inno-database",
-  storageBucket: "inno-database.firebasestorage.app",
-  messagingSenderId: "218803017037",
-  appId: "1:218803017037:web:51f8549c127bd2cef5d304",
+  apiKey: extra.FIREBASE_API_KEY,
+  authDomain: extra.FIREBASE_AUTH_DOMAIN,
+  projectId: extra.FIREBASE_PROJECT_ID,
+  storageBucket: extra.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: extra.FIREBASE_MESSAGING_SENDER_ID,
+  appId: extra.FIREBASE_APP_ID,
 };
 
 // Initialize Firebase
