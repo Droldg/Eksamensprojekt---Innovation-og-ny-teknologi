@@ -2,7 +2,7 @@ import { View, Text, FlatList, Image, Pressable } from "react-native";
 import styles from "../style/styles";
 import { useReservations } from "../context/ReservationsContext";
 
-function ItemCard({ item, onCancel }) {
+function ItemCard({ item }) {
   return (
     <View style={[styles.card, styles.headerBlock]}>
       <View style={styles.cardRow}>
@@ -32,27 +32,13 @@ function ItemCard({ item, onCancel }) {
           ) : null}
         </View>
       </View>
-
-      <View style={styles.v8} />
-      <Pressable
-        style={({ pressed }) => [
-          styles.btn,
-          styles.btnOutline,
-          pressed && styles.btnOutlinePressed,
-        ]}
-        onPress={() => onCancel(item.id)}
-        android_ripple={{ color: "rgba(0,0,0,0.06)" }}
-      >
-        <Text style={styles.btnOutlineText}>Annullér reservation</Text>
-      </Pressable>
     </View>
   );
 }
 
 export default function ReservedOffersScreen({ navigation }) {
-  const { items, remove, clear } = useReservations();
+  const { items } = useReservations();
 
-  // TOM TILSTAND — hvid rubrik (samme som infosiden)
   if (!items.length) {
     return (
       <View style={[styles.container, styles.emptyContainer]}>
@@ -79,7 +65,6 @@ export default function ReservedOffersScreen({ navigation }) {
     );
   }
 
-  // LISTE MED RESERVATIONER
   return (
     <View style={styles.container}>
       <FlatList
@@ -90,25 +75,10 @@ export default function ReservedOffersScreen({ navigation }) {
         ListHeaderComponent={
           <View style={styles.headerBlock}>
             <Text style={styles.title}>Dine reservationer</Text>
-            <Text style={styles.helperText}>
-              Vis frem ved afhentning. Du kan annullere her i appen.
-            </Text>
-
-            <View style={styles.v8} />
-            <Pressable
-              style={({ pressed }) => [
-                styles.btn,
-                styles.btnSecondary,
-                pressed && styles.btnSecondaryPressed,
-              ]}
-              onPress={clear}
-              android_ripple={{ color: "rgba(0,0,0,0.06)" }}
-            >
-              <Text style={styles.btnSecondaryText}>Ryd alle</Text>
-            </Pressable>
+            <Text style={styles.helperText}>Vis frem ved afhentning.</Text>
           </View>
         }
-        renderItem={({ item }) => <ItemCard item={item} onCancel={remove} />}
+        renderItem={({ item }) => <ItemCard item={item} />}
       />
     </View>
   );

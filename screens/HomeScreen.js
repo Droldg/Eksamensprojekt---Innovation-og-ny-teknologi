@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, Pressable, Alert, Modal, TextInput } from "react-native";
 import styles from "../style/styles";
 import { auth, db } from "../database/database";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 
 function AppButton({ title, onPress, variant = "primary", full = true }) {
   const base = [styles.btn, full && styles.btnFull];
@@ -43,33 +43,41 @@ export default function HomeScreen({ navigation }) {
   const [loadingUser, setLoadingUser] = useState(true);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [locationPin, setLocationPin] = useState("");
+  const [role, setRole] = useState(null);
+  const [locId, setLocId] = useState(null);
 
   // Hent brugerens profil og se om der allerede er en locID
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) {
-          setLoadingUser(false);
-          return;
-        }
+    const user = auth.currentUser;
+    if (!user) {
+      setLoadingUser(false);
+      return;
+    }
 
-        const userRef = doc(db, "users", user.uid);
-        const snap = await getDoc(userRef);
+    const userRef = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(
+      userRef,
+      (snap) => {
         if (snap.exists()) {
           const data = snap.data();
+          setLocId(data.locID || null);
           setHasLocation(!!data.locID);
+          setRole(data.role || null);
         } else {
+          setLocId(null);
           setHasLocation(false);
+          setRole(null);
         }
-      } catch (e) {
+        setLoadingUser(false);
+      },
+      (e) => {
         console.log("Fejl ved hentning af brugerprofil:", e);
-      } finally {
+        setLocId(null);
         setLoadingUser(false);
       }
-    };
+    );
 
-    fetchUser();
+    return unsubscribe;
   }, []);
 
   // Gem arbejdspladskode på brugeren
@@ -115,7 +123,10 @@ export default function HomeScreen({ navigation }) {
       );
     } catch (e) {
       console.log("Fejl ved opdatering af locID:", e);
-      Alert.alert("Fejl", "Kunne ikke gemme koden. Prøv igen.");
+      Alert.alert(
+        "Fejl",
+        `Kunne ikke gemme koden. (${e.code || ""} ${e.message || ""})`
+      );
     }
   };
 
@@ -146,6 +157,21 @@ export default function HomeScreen({ navigation }) {
         variant="secondary"
         onPress={() => navigation.navigate("Profile")}
       />
+
+      {(() => {
+        const isCanteen = (role || "").toLowerCase() === "canteen";
+        const canSeePanel = isCanteen && !!locId;
+        return canSeePanel ? (
+          <>
+            <View style={styles.v8} />
+            <AppButton
+              title="Kantinepanel"
+              variant="primary"
+              onPress={() => navigation.navigate("CanteenPanel")}
+            />
+          </>
+        ) : null;
+      })()}
 
        
       {!loadingUser && !hasLocation && (

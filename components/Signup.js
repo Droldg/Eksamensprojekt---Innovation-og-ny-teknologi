@@ -56,6 +56,7 @@ export default function Signup() {
         email: emailTrimmed,
         phone: phoneTrimmed,
         locID: null,
+        role: "user",
         createdAt: new Date().toISOString(),
       });
 

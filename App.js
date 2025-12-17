@@ -1,15 +1,14 @@
-// App.js
 import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-// Eksisterende skærme
 import HomeScreen from "./screens/HomeScreen";
 import OffersScreen from "./screens/OffersScreen";
 import ReservedOffersScreen from "./screens/ReservedOffersScreen"; // <-- NY
 import InfoScreen from "./screens/InfoScreen";
 import Authentication from "./screens/Authentication";
 import ProfileScreen from "./screens/ProfileScreen";
+import CanteenPanel from "./screens/CanteenPanel";
 
 // Firebase auth 
 import { auth } from "./database/database";
@@ -59,6 +58,11 @@ export default function App() {
               name="Info"
               component={InfoScreen}
               options={{ title: "Info" }}
+            />
+            <Stack.Screen
+              name="CanteenPanel"
+              component={CanteenPanel}
+              options={{ title: "Kantinepanel" }}
             />
           </Stack.Navigator>
         ) : (
