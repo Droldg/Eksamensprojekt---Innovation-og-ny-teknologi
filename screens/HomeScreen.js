@@ -4,7 +4,7 @@ import styles from "../style/styles";
 import { auth, db } from "../database/database";
 import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 
-function AppButton({ title, onPress, variant = "primary", full = true }) {
+function AppButton({ title, onPress, variant = "primary", full = true, size = "md" }) {
   const base = [styles.btn, full && styles.btnFull];
 
   const map = {
@@ -23,17 +23,31 @@ function AppButton({ title, onPress, variant = "primary", full = true }) {
     outline: styles.btnOutlineText,
   };
 
+  const sizeStyle =
+    size === "lg"
+      ? { height: 56, borderRadius: 14 }
+      : size === "sm"
+      ? { height: 42, borderRadius: 10 }
+      : null;
+  const textSize =
+    size === "lg"
+      ? { fontSize: 16 }
+      : size === "sm"
+      ? { fontSize: 13 }
+      : null;
+
   return (
     <Pressable
       accessibilityRole="button"
       style={({ pressed }) => [
         ...base,
         ...(map[variant] || map.primary),
+        sizeStyle,
         pressed && (pressedMap[variant] || pressedMap.primary),
       ]}
       onPress={onPress}
     >
-      <Text style={textMap[variant]}>{title}</Text>
+      <Text style={[textMap[variant], textSize]}>{title}</Text>
     </Pressable>
   );
 }
@@ -85,10 +99,7 @@ export default function HomeScreen({ navigation }) {
     const pinTrimmed = locationPin.trim();
 
     if (!/^\d{4}$/.test(pinTrimmed)) {
-      Alert.alert(
-        "Ugyldig kode",
-        "Arbejdspladskoden skal være præcis 4 cifre."
-      );
+      Alert.alert("Ugyldig kode", "Arbejdspladskoden skal være præcis 4 cifre.");
       return;
     }
 
@@ -98,10 +109,7 @@ export default function HomeScreen({ navigation }) {
       const locationSnap = await getDoc(locationRef);
 
       if (!locationSnap.exists()) {
-        Alert.alert(
-          "Ugyldig kode",
-          "Der findes ingen arbejdsplads med denne kode."
-        );
+        Alert.alert("Ugyldig kode", "Der findes ingen arbejdsplads med denne kode.");
         return;
       }
 
@@ -117,46 +125,44 @@ export default function HomeScreen({ navigation }) {
       setHasLocation(true);
       setShowLocationModal(false);
       setLocationPin("");
-      Alert.alert(
-        "Gemt",
-        "Din arbejdspladskode er nu tilknyttet din profil."
-      );
+      Alert.alert("Gemt", "Din arbejdspladskode er nu tilknyttet din profil.");
     } catch (e) {
       console.log("Fejl ved opdatering af locID:", e);
-      Alert.alert(
-        "Fejl",
-        `Kunne ikke gemme koden. (${e.code || ""} ${e.message || ""})`
-      );
+      Alert.alert("Fejl", `Kunne ikke gemme koden. (${e.code || ""} ${e.message || ""})`);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.appTitle}>MadRedder</Text>
-      <Text style={styles.subtitle}>
-        Få overblik over dagens rester i kantinen og reserver en boks til lav pris.
-      </Text>
+      <View style={[styles.card, { backgroundColor: "#E6F0EC", borderColor: "transparent" }]}>
+        <Text style={styles.appTitle}>MadRedder</Text>
+        <Text style={[styles.subtitle, { marginBottom: 14 }]}>
+          Få overblik over dagens rester i kantinen og reserver en boks til lav pris. Husk at vise din reservation
+          ved afhentning.
+        </Text>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <View style={[styles.badge, { backgroundColor: "#1D6142" }]}>
+            <Text style={styles.badgeText}>Kantine</Text>
+          </View>
+          <View style={[styles.badge, { backgroundColor: "#FF9A8A" }]}>
+            <Text style={styles.badgeText}>Daglige tilbud</Text>
+          </View>
+        </View>
+      </View>
 
-      <View style={styles.v8} />
-      <AppButton
-        title="Se tilbud"
-        variant="primary"
-        onPress={() => navigation.navigate("Offers")}
-      />
+      <View style={styles.v16} />
+      <AppButton title="Se tilbud" variant="primary" size="lg" onPress={() => navigation.navigate("Offers")} />
 
       <View style={styles.v8} />
       <AppButton
         title="Reserveret tilbud"
         variant="outline"
+        size="lg"
         onPress={() => navigation.navigate("ReservedOffers")}
       />
 
       <View style={styles.v8} />
-      <AppButton
-        title="Min profil"
-        variant="secondary"
-        onPress={() => navigation.navigate("Profile")}
-      />
+      <AppButton title="Min profil" variant="secondary" size="lg" onPress={() => navigation.navigate("Profile")} />
 
       {(() => {
         const isCanteen = (role || "").toLowerCase() === "canteen";
@@ -167,34 +173,33 @@ export default function HomeScreen({ navigation }) {
             <AppButton
               title="Kantinepanel"
               variant="primary"
+              size="lg"
               onPress={() => navigation.navigate("CanteenPanel")}
             />
           </>
         ) : null;
       })()}
 
-       
       {!loadingUser && !hasLocation && (
         <>
           <View style={styles.v8} />
           <AppButton
             title="Tilføj arbejdspladskode"
             variant="primary"
+            size="lg"
             onPress={() => setShowLocationModal(true)}
           />
         </>
       )}
 
       <View style={styles.v8} />
-      <AppButton
-        title="Info"
-        variant="outline"
-        onPress={() => navigation.navigate("Info")}
-      />
+      <AppButton title="Info" variant="outline" size="lg" onPress={() => navigation.navigate("Info")} />
+
       <View style={styles.v16} />
       <Text style={styles.helperText}>
         Tip: Tilbud opdateres i løbet af eftermiddagen. Afhent inden for det angivne tidsrum.
       </Text>
+
       <Modal
         visible={showLocationModal}
         transparent
@@ -204,9 +209,7 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Tilføj arbejdspladskode</Text>
-            <Text style={styles.modalText}>
-              Indtast den 4-cifrede kode, du har fået af din arbejdsplads.
-            </Text>
+            <Text style={styles.modalText}>Indtast den 4-cifrede kode, du har fået af din arbejdsplads.</Text>
 
             <TextInput
               style={[styles.input, { marginTop: 12 }]}
@@ -227,10 +230,7 @@ export default function HomeScreen({ navigation }) {
               >
                 <Text style={styles.modalButtonSecondaryText}>Annuller</Text>
               </Pressable>
-              <Pressable
-                style={styles.modalButtonSecondary}
-                onPress={handleSaveLocation}
-              >
+              <Pressable style={styles.modalButtonSecondary} onPress={handleSaveLocation}>
                 <Text style={styles.modalButtonSecondaryText}>Gem kode</Text>
               </Pressable>
             </View>
