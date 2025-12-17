@@ -1,4 +1,3 @@
-// screens/OffersScreen.js
 import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, FlatList, Pressable, Platform, ActivityIndicator, Alert } from "react-native";
 import styles from "../style/styles";

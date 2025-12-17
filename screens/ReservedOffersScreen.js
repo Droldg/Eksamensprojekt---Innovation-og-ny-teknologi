@@ -1,4 +1,3 @@
-import React from "react";
 import { View, Text, FlatList, Image, Pressable } from "react-native";
 import styles from "../style/styles";
 import { useReservations } from "../context/ReservationsContext";

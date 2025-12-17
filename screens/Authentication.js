@@ -1,4 +1,3 @@
-// Authentication.js
 // Authentication.js håndterer skift mellem Login og Signup komponenter.
 import React, { useState } from "react";
 import { View, Pressable, Text } from "react-native";

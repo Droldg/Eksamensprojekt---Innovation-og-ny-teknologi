@@ -1,4 +1,3 @@
-// scripts/seedOffers.mjs
 // Client-baseret seeding (respekterer Firestore rules). Kræver at dine regler tillader write til offers.
 import { config as loadEnv } from "dotenv";
 loadEnv();

@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-// Dine eksisterende skærme
+// Eksisterende skærme
 import HomeScreen from "./screens/HomeScreen";
 import OffersScreen from "./screens/OffersScreen";
 import ReservedOffersScreen from "./screens/ReservedOffersScreen"; // <-- NY
@@ -11,7 +11,7 @@ import InfoScreen from "./screens/InfoScreen";
 import Authentication from "./screens/Authentication";
 import ProfileScreen from "./screens/ProfileScreen";
 
-// Firebase auth (din eksisterende opsætning)
+// Firebase auth 
 import { auth } from "./database/database";
 import { onAuthStateChanged } from "firebase/auth";
 

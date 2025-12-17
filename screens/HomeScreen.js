@@ -1,4 +1,3 @@
-// HomeScreen.js
 import React, { useEffect, useState } from "react";
 import { View, Text, Pressable, Alert, Modal, TextInput } from "react-native";
 import styles from "../style/styles";
