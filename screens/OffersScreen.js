@@ -3,38 +3,31 @@ import { View, Text, FlatList, Pressable, Platform, ActivityIndicator, Alert } f
 import styles from "../style/styles";
 import { useReservations } from "../context/ReservationsContext";
 import { auth, db } from "../database/database";
-import {
-  collection,
-  doc,
-  onSnapshot,
-  query,
-  runTransaction,
-  where,
-} from "firebase/firestore";
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 
 export default function OffersScreen() {
-  const { add, items: reservedItems } = useReservations();
+  const { add, reservedIds, loading: reservationsLoading } = useReservations();
 
   const [offers, setOffers] = useState([]);
   const [onlyAvailable, setOnlyAvailable] = useState(false);
-  const [reservedIds, setReservedIds] = useState(new Set());
+  const [reservedCounts, setReservedCounts] = useState({});
 
   const [locID, setLocID] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [error, setError] = useState(null);
 
-  // Synkroniser markerede reservationer med global state (så de vises som "Reserveret")
-  useEffect(() => {
-    setReservedIds(new Set(reservedItems.map((x) => String(x.id))));
-  }, [reservedItems]);
+  const reservedSet = useMemo(
+    () => new Set((reservedIds || []).map((x) => String(x))),
+    [reservedIds]
+  );
 
   // Lyt til brugerens profil for at få locID
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) {
       setLoadingProfile(false);
-      return;
+      return undefined;
     }
 
     const userRef = doc(db, "users", user.uid);
@@ -59,11 +52,36 @@ export default function OffersScreen() {
     return unsubscribe;
   }, []);
 
+  // Lyt til alle brugeres reservationer for at udregne rest-qty pr. offer
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "users"),
+      (snap) => {
+        const counts = {};
+        snap.forEach((docSnap) => {
+          const data = docSnap.data();
+          const ids = Array.isArray(data.reservedIds) ? data.reservedIds : [];
+          ids.forEach((id) => {
+            const key = String(id);
+            counts[key] = (counts[key] || 0) + 1;
+          });
+        });
+        setReservedCounts(counts);
+      },
+      (err) => {
+        console.log("Fejl ved hentning af reservationer:", err);
+        setReservedCounts({});
+      }
+    );
+
+    return unsub;
+  }, []);
+
   // Lyt til tilbud for den aktuelle lokation
   useEffect(() => {
     if (!locID) {
       setOffers([]);
-      return;
+      return undefined;
     }
 
     setLoadingOffers(true);
@@ -103,66 +121,47 @@ export default function OffersScreen() {
     return unsubscribe;
   }, [locID]);
 
-  const list = useMemo(
-    () => offers.filter((o) => (onlyAvailable ? o.qty > 0 : true)),
-    [offers, onlyAvailable]
-  );
+  const list = useMemo(() => {
+    return offers
+      .map((o) => {
+        const reservedQty = reservedCounts[o.id] || 0;
+        const available = Math.max(0, (Number(o.qty) || 0) - reservedQty);
+        return { ...o, available };
+      })
+      .filter((o) => (onlyAvailable ? o.available > 0 : true));
+  }, [offers, onlyAvailable, reservedCounts]);
 
   const reserve = async (offer) => {
-    if (reservedIds.has(offer.id)) return;
+    if (reservedSet.has(offer.id)) return;
     if (!locID) {
       Alert.alert("Mangler arbejdsplads", "Tilføj din arbejdspladskode først.");
       return;
     }
 
+    const reservedQty = reservedCounts[offer.id] || 0;
+    const available = Math.max(0, (Number(offer.qty) || 0) - reservedQty);
+    if (available <= 0) {
+      Alert.alert("Udsolgt", "Der er ikke flere bokse tilbage af dette tilbud.");
+      return;
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert("Fejl", "Ingen bruger er logget ind.");
+      return;
+    }
+
     try {
-      await runTransaction(db, async (transaction) => {
-        const ref = doc(db, "offers", offer.id);
-        const snap = await transaction.get(ref);
-        if (!snap.exists()) {
-          throw new Error("Tilbud findes ikke længere.");
-        }
-
-        const data = snap.data();
-        if (data.locID !== locID) {
-          throw new Error("Tilbud hører til en anden lokation.");
-        }
-
-        const currentQty = typeof data.qty === "string" ? Number(data.qty) : data.qty || 0;
-        if (currentQty <= 0) {
-          throw new Error("Udsolgt");
-        }
-
-        transaction.update(ref, { qty: currentQty - 1 });
-      });
-
-      // Optimistisk lokalt bump ned – Firestore snapshot korrigerer lige efter
-      setOffers((prev) =>
-        prev.map((o) => (o.id === offer.id ? { ...o, qty: Math.max(0, o.qty - 1) } : o))
-      );
-
-      add({
-        id: offer.id,
-        title: offer.title,
-        price: offer.price,
-        pickupWindow: offer.pickup,
-        items: offer.items,
-      });
-
-      setReservedIds((prev) => new Set([...prev, offer.id]));
+      await add(offer.id);
     } catch (e) {
-      if (e.message === "Udsolgt") {
-        Alert.alert("Udsolgt", "Desværre, boksen blev lige nappet.");
-      } else {
-        console.log("Fejl ved reservation:", e);
-        Alert.alert("Fejl", e.message || "Kunne ikke reservere. Prøv igen.");
-      }
+      console.log("Fejl ved reservation:", e);
+      Alert.alert("Fejl", e.message || "Kunne ikke reservere. Prøv igen.");
     }
   };
 
   const badgeBg = (qty) => (qty > 0 ? "#1D6142" : "#D33A2C");
 
-  if (loadingProfile) {
+  if (loadingProfile || reservationsLoading) {
     return (
       <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
         <ActivityIndicator />
@@ -216,8 +215,8 @@ export default function OffersScreen() {
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         contentContainerStyle={{ paddingBottom: 24 }}
         renderItem={({ item }) => {
-          const alreadyReserved = reservedIds.has(item.id);
-          const isSoldOut = item.qty === 0;
+          const alreadyReserved = reservedSet.has(item.id);
+          const isSoldOut = item.available === 0;
           const disabled = isSoldOut || alreadyReserved;
 
           return (
@@ -225,9 +224,9 @@ export default function OffersScreen() {
               <View style={styles.row}>
                 <Text style={styles.cardTitle}>{item.title}</Text>
 
-                <View style={[styles.badge, { backgroundColor: badgeBg(item.qty) }]}>
+                <View style={[styles.badge, { backgroundColor: badgeBg(item.available) }]}>
                   <Text style={styles.badgeText}>
-                    {isSoldOut ? "Udsolgt" : `${item.qty} tilbage`}
+                    {isSoldOut ? "Udsolgt" : `${item.available} tilbage`}
                   </Text>
                 </View>
               </View>
