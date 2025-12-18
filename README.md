@@ -34,3 +34,6 @@ MadRedder er en mobilapp (Expo + React Native) udviklet som eksamensprojekt i **
 ```bash
 npm install
 
+### 2) Start expo
+```bash
+npx expo start -c
